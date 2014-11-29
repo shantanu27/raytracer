@@ -168,15 +168,10 @@ int main (int argc, char* argv[])
 	Vector cameraPos(3.0, 1.5, -4.0); 
 	Vector lookAt(0.0, 0.0, 0.0);
 
-	// Vector diffBetween(cameraPos.getX()-lookAt.getX(), 
-	// 				   cameraPos.getY()-lookAt.getY(), 
-	// 				   cameraPos.getZ()-lookAt.getZ());
+	Vector diffBetween(cameraPos.getX()-lookAt.getX(), 
+					   cameraPos.getY()-lookAt.getY(), 
+					   cameraPos.getZ()-lookAt.getZ());
 
-	Vector viewDirection(lookAt.getX()-cameraPos.getX(), 
-					   lookAt.getY()-cameraPos.getY(), 
-					   lookAt.getZ()-cameraPos.getZ());
-
-	//Vector cameraDirection = diffBetween.negative().normalize();
 	Vector cameraDirection = viewDirection.negative().normalize();
 	Vector cameraRight = Y.crossProduct(cameraDirection).normalize();		//for cameraUp ==> cameraDirection x Up
 	Vector cameraDown = cameraRight.crossProduct(cameraDirection).normalize();
