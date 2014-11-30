@@ -32,10 +32,9 @@ class Plane : public Object {
 			}
 		}
 
-	private:
+	protected:
 		Vector normal;
 		double distance;
-		Color color;
 };
 
 Plane::Plane () 

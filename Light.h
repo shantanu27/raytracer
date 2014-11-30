@@ -11,8 +11,8 @@ class Light {
 
 		//method functions
 		Vector getPosition() { return position; }
-
 		Color getColor() { return color; }
+
 	private:
 		Vector position;
 		Color color;

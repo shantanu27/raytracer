@@ -16,6 +16,28 @@ class Color {
 		double setBlue(double blueValue) { blue = blueValue; }
 		double setSpecial(double specialValue) { special = specialValue; }
 
+		double brightness() { return 0.299*red + 0.587*green + 0.114*blue; }
+
+		Color add(Color c) 
+		{
+			return Color(red + c.getRed(), green + c.getGreen(), blue + c.getBlue(), special + c.getSpecial()); 
+		}
+
+		Color subtract(Color c) 
+		{
+			return Color(red - c.getRed(), green - c.getGreen(), blue - c.getBlue(), special - c.getSpecial()); 
+		}
+
+		Color scalarMultiply(double s)
+		{
+			return Color(red*s, green*s, blue*s, special*s);
+		}
+
+		Color scalarDivide(double s)
+		{
+			return Color(red/s, green/s, blue/s, special/s);
+		}
+
 	private:
 		double red, green, blue, special;
 };

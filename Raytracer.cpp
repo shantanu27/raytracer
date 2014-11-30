@@ -168,7 +168,7 @@ int main (int argc, char* argv[])
 	Vector cameraPos(3.0, 1.5, -4.0); 
 	Vector lookAt(0.0, 0.0, 0.0);
 
-	Vector diffBetween(cameraPos.getX()-lookAt.getX(), 
+	Vector viewDirection(cameraPos.getX()-lookAt.getX(), 
 					   cameraPos.getY()-lookAt.getY(), 
 					   cameraPos.getZ()-lookAt.getZ());
 
@@ -177,8 +177,6 @@ int main (int argc, char* argv[])
 	Vector cameraDown = cameraRight.crossProduct(cameraDirection).normalize();
 
 	Camera sceneCamera(cameraPos, cameraDirection, cameraRight, cameraDown);
-
-	double distanceValue = 0.5 / tan(M_PI/6);
 
 	Color white(1.0, 1.0, 1.0, 0.0);
 	Color prettyGreen(0.5, 1.0, 0.5, 0.3);
@@ -217,10 +215,9 @@ int main (int argc, char* argv[])
 				xAmnt = (x + 0.5)/width;
 				yAmnt = ((height - y) + 0.5)/height;
 			}
-			
+
 			Vector cameraRayOrigin = sceneCamera.getPosition();
 			Vector cameraRayDirection = cameraDirection.add(cameraRight.scalarMultiply(xAmnt - 0.5).add(cameraDown.scalarMultiply(yAmnt - 0.5))).normalize();
-
 			Ray cameraRay(cameraRayOrigin, cameraRayDirection);
 
 			vector<double> intersections;
@@ -230,6 +227,7 @@ int main (int argc, char* argv[])
 			}
 
 			int indexOfClosestObject = closestObjectIndex(intersections);
+			cout<<indexOfClosestObject;
 
 			// return color
 			if (indexOfClosestObject == -1) {

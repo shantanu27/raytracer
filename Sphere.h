@@ -52,15 +52,15 @@ class Sphere : public Object {
 				// the ray intersects the sphere
 
 				// the first root 
-				double root_1 = (((-1*b - sqrt (discriminant))/2) - 0.000001);
+				double distance1 = (((-1*b - sqrt (discriminant))/2) - 0.000001);
+				double distance2 = ((sqrt(discriminant) - b)/2) - 0.000001;
 
-				if (root_1 >0) {
-					// the first root is the smallest positive root
-					return root_1; 
+				if (distance1 > 0) {
+					//whichever is closer
+					return distance1; 
 				} else {
 					// the second root is the smallest positive root
-					double root_2 = ((sqrt(discriminant) - b)/2) - 0.000001;
-					return root_2;
+					return distance2;
 				}
 			} else {
 					// the ray missed the sphere
@@ -68,10 +68,9 @@ class Sphere : public Object {
 			}
 		}
 
-	private:
+	protected:
 		Vector center;
 		double radius;
-		Color color;
 };
 
 Sphere::Sphere () 

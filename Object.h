@@ -14,6 +14,13 @@ class Object {
 
 
 		virtual double findIntersection(Ray ray) { return 0; }
+
+	protected:
+		Color color;
+		double diffuseCoefficient;
+		double specularCoefficient;
+		double reflectivity;
+		double phongShininess;
 };
 
 Object::Object () {}
