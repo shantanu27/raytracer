@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <cfloat>
 #include <cmath>
 #include <limits>
 
@@ -143,6 +144,94 @@ int closestObjectIndex(vector<double> objects)
 	}
 }
 
+Color computeColorAtIntersection(Vector intersectPosition, 
+								Vector intersectDirection, 
+								vector<Object*> sceneObjects, 
+								int indexOfClosestObject, 
+								double lightAmbience,
+								vector<Light>& lightSources)
+{
+	Object* currentObject = sceneObjects.at(indexOfClosestObject);
+	Color surfaceColor = currentObject->getColor();
+	Vector surfaceNormal = currentObject->normalAt(intersectPosition);
+	bool isObjectInShadow = false;
+
+	double kd = currentObject->getDiffuseCoefficient();
+	double ks = currentObject->getSpecularCoefficient();
+	double n = currentObject->getPhongShininess();
+
+	Color finalColor(0,0,0);
+	Color diffuse(0,0,0);
+	Color specular(0,0,0);
+	Color ambient(0,0,0);
+
+	for (vector<Light>::iterator light = lightSources.begin(); light != lightSources.end(); ++light) {
+
+		Color lightColor = light->getColor();
+
+		// rayToLight = lightSourceCenter - intersectPoint
+		Vector vectorToLight = (light->getPosition()).subtract(intersectPosition);
+		double lightSourceDistance = vectorToLight.magnitude();
+		vectorToLight = vectorToLight.normalize();		
+
+		//ray from intersecting point to lightSource
+		Ray rayToLight(intersectPosition, vectorToLight);
+
+		vector<double> secondaryIntersections;
+
+		//find if the ray intersected any of the objects in the scene
+		for (vector<Object*>::iterator object = sceneObjects.begin(); object != sceneObjects.end(); ++object) {	
+			secondaryIntersections.push_back((*object)->findIntersection(rayToLight));
+		}
+
+		// find closest object from the intersections
+		for (vector<double>::iterator distance = secondaryIntersections.begin(); distance != secondaryIntersections.end(); ++distance) {
+			if ((*distance) > FLT_EPSILON) {
+				if (*distance <= lightSourceDistance) {
+					isObjectInShadow = true;
+					break;
+				}
+			}
+		}
+
+		double lightDotNormal = surfaceNormal.dotProduct(vectorToLight);
+		lightDotNormal = lightDotNormal < 0 ? 0.0f : lightDotNormal;	
+
+		if (kd > 0) {
+			ambient = finalColor.add((lightColor.scalarMultiply(lightAmbience*kd)).multiply(surfaceColor));
+		} else {
+			ambient = finalColor.add((lightColor.scalarMultiply(lightAmbience)).multiply(surfaceColor));
+		}
+
+		finalColor = finalColor.add(ambient);
+
+		if (isObjectInShadow == false) {
+
+			if (kd > 0) {
+				diffuse = diffuse.add(((surfaceColor.scalarMultiply(kd)).multiply(lightColor)).scalarMultiply(lightDotNormal));
+			}
+			
+			Vector L = vectorToLight;	//vector from intersection point to light normalized
+			Vector N = surfaceNormal;	// surface normal
+			Vector V = intersectDirection.negative().normalize();	//vector towards eye point
+
+			double LDotN = L.dotProduct(N);
+			Vector R = (N.scalarMultiply(2*LDotN)).subtract(L);		//reflected ray
+
+			double RDotV = R.dotProduct(V);
+			
+			if (ks > 0 && n > 0) {
+				specular = lightColor.scalarMultiply(ks*pow(RDotV,n)); 
+			}
+			finalColor = (finalColor.add(diffuse)).add(specular);			
+		} 
+		
+	}
+
+	//default color is black
+	return finalColor.clip();
+}	
+
 int currentPixel;
 
 int main (int argc, char* argv[]) 
@@ -178,21 +267,31 @@ int main (int argc, char* argv[])
 
 	Camera sceneCamera(cameraPos, cameraDirection, cameraRight, cameraDown);
 
-	Color white(1.0, 1.0, 1.0, 0.0);
-	Color prettyGreen(0.5, 1.0, 0.5, 0.3);
-	Color maroon(0.5, 0.25, 0.25, 0.0);
-	Color gray(0.5, 0.5, 0.5, 0.0);
-	Color black(0.0, 0.0, 0.0, 0.0);
+	Color white(1.0, 1.0, 1.0);
+	Color prettyGreen(0.5, 1.0, 0.5);
+	Color maroon(0.5, 0.25, 0.25);
+	Color gray(0.5, 0.5, 0.5);
+	Color black(0.0, 0.0, 0.0);
+
+	//define light ambience and store light sources in a vector
+	double lightAmbience = 0.2;
+	vector<Light> lightSources;
 
 	Vector lightPosition(-7.0, 10.0, -10.0);
 	Light sceneLight(lightPosition, white);
+	lightSources.push_back(sceneLight);
 
 	//Vector to store the current objects in the scene
 	vector<Object *> sceneObjects;
 
 	//scene description
 	Sphere sceneSphere(O, 1, prettyGreen);
+	sceneSphere.setDiffuseCoefficient(0.5);
+	sceneSphere.setSpecularCoefficient(0.3);
+	sceneSphere.setPhongShininess(10);	
+
 	Plane scenePlane(Y, -1, maroon);
+	scenePlane.setDiffuseCoefficient(0.5);
 
 	sceneObjects.push_back(dynamic_cast<Object *>(&sceneSphere));
 	sceneObjects.push_back(dynamic_cast<Object *>(&scenePlane));
@@ -227,7 +326,6 @@ int main (int argc, char* argv[])
 			}
 
 			int indexOfClosestObject = closestObjectIndex(intersections);
-			cout<<indexOfClosestObject;
 
 			// return color
 			if (indexOfClosestObject == -1) {
@@ -235,10 +333,23 @@ int main (int argc, char* argv[])
 				pixels[currentPixel].g = 0;
 				pixels[currentPixel].b = 0;
 			} else {
-				Color pixelColor = sceneObjects.at(indexOfClosestObject)->getColor();
-				pixels[currentPixel].r = pixelColor.getRed();
-				pixels[currentPixel].g = pixelColor.getGreen();
-				pixels[currentPixel].b = pixelColor.getBlue();
+				// to accomodate for precision errors
+				if (intersections.at(indexOfClosestObject) > FLT_EPSILON) {
+					//calculate intersection position
+					Vector intersectPosition = cameraRayOrigin.add(cameraRayDirection.scalarMultiply(intersections.at(indexOfClosestObject)));
+					Vector intersectDirection = cameraRayDirection;
+
+					Color intersectionColor = computeColorAtIntersection(intersectPosition, 
+																		intersectDirection, 
+																		sceneObjects, 
+																		indexOfClosestObject, 
+																		lightAmbience,
+																		lightSources);
+
+					pixels[currentPixel].r = intersectionColor.getRed();
+					pixels[currentPixel].g = intersectionColor.getGreen();
+					pixels[currentPixel].b = intersectionColor.getBlue();
+				}
 			}
 		}
 	}

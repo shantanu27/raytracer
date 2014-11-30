@@ -1,6 +1,7 @@
 #ifndef _SPHERE_H
 #define _SPHERE_H
 
+#include <cfloat>
 #include <cmath>
 
 #include "Color.h"
@@ -17,7 +18,7 @@ class Sphere : public Object {
 		double getRadius() { return radius; }
 		virtual Color getColor() { return color; }
 
-		Vector normalAt(Vector point) 
+		virtual Vector normalAt(Vector point) 
 		{
 			//normal points away from the center
 			Vector normalVector = point.add(center.negative()).normalize();
@@ -52,8 +53,8 @@ class Sphere : public Object {
 				// the ray intersects the sphere
 
 				// the first root 
-				double distance1 = (((-1*b - sqrt (discriminant))/2) - 0.000001);
-				double distance2 = ((sqrt(discriminant) - b)/2) - 0.000001;
+				double distance1 = (((-1*b - sqrt (discriminant))/2) - 0.001);	// to accomodate for float point errors
+				double distance2 = ((sqrt(discriminant) - b)/2) - 0.001;	// we make sure the intersection is outside the sphere
 
 				if (distance1 > 0) {
 					//whichever is closer
@@ -77,10 +78,11 @@ Sphere::Sphere ()
 {
 	center = Vector (0.0, 0.0 , 0.0);
 	radius = 1.0;
-	color = Color (0.5, 0.5, 0.5, 0.0);
+	color = Color (0.5, 0.5, 0.5);
 }
 
-Sphere::Sphere (Vector centerValue, double radiusValue, Color sphereColor) 
+Sphere::Sphere (Vector centerValue, double radiusValue, Color sphereColor)
+	:Object() 
 {
 	center = centerValue;
 	radius = radiusValue;

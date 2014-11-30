@@ -10,8 +10,18 @@ class Object {
 		Object();
 
 		//method functions
-		virtual Color getColor() { return Color(0.0, 0.0, 0.0, 0.0); }
+		double getDiffuseCoefficient() { return diffuseCoefficient; }
+		double getSpecularCoefficient() { return specularCoefficient; }
+		double getReflectivity() { return reflectivity; }
+		double getPhongShininess() { return phongShininess; }
 
+		void setDiffuseCoefficient(double kd) { diffuseCoefficient = kd; }
+		void setSpecularCoefficient(double ks) { specularCoefficient = ks; }
+		void setReflectivity(double pr) { reflectivity = pr; }
+		void setPhongShininess(double n) { phongShininess = n; }
+
+		virtual Color getColor() { return Color(0.0, 0.0, 0.0); }
+		virtual Vector normalAt(Vector point) { return Vector(0,0,0); }
 
 		virtual double findIntersection(Ray ray) { return 0; }
 
@@ -23,6 +33,12 @@ class Object {
 		double phongShininess;
 };
 
-Object::Object () {}
+Object::Object () 
+{
+	diffuseCoefficient = 0;
+	specularCoefficient = 0;
+	reflectivity = 0;
+	phongShininess = 0;
+}
 
 #endif

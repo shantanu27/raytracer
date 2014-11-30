@@ -21,7 +21,7 @@ class Light {
 Light::Light () 
 {
 	position = Vector (0.0, 0.0, 0.0);
-	color = Color (1.0, 1.0, 1.0, 0.0);
+	color = Color (1.0, 1.0, 1.0);
 }
 
 Light::Light (Vector pos, Color lightColor) 

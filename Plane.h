@@ -8,14 +8,14 @@
 class Plane : public Object {
 	public:
 		Plane();
-		Plane (Vector center, double distanceValue, Color color);
+		Plane (Vector normal, double distanceValue, Color color);
 
 		//method functions
 		Vector getNormal() { return normal; }
 		double getDistance() { return distance; }
 		virtual Color getColor() { return color; }
 
-		Vector normalAt(Vector point) { return normal; }
+		virtual Vector normalAt(Vector point) { return normal; }
 
 		virtual double findIntersection(Ray ray) 
 		{
@@ -41,10 +41,11 @@ Plane::Plane ()
 {
 	normal = Vector (1.0 , 0.0, 0.0);
 	distance = 0.0;
-	color = Color (0.5, 0.5, 0.5, 0);
+	color = Color (0.5, 0.5, 0.5);
 }
 
-Plane::Plane (Vector normalValue, double distanceValue, Color planeColor) 
+Plane::Plane (Vector normalValue, double distanceValue, Color planeColor)
+	:Object() 
 {
 	normal = normalValue;
 	distance = distanceValue;
