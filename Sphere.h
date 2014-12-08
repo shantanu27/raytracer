@@ -53,8 +53,9 @@ class Sphere : public Object {
 				// the ray intersects the sphere
 
 				// the first root 
-				double distance1 = (((-1*b - sqrt (discriminant))/2) - 0.001);	// to accomodate for float point errors
-				double distance2 = ((sqrt(discriminant) - b)/2) - 0.001;	// we make sure the intersection is outside the sphere
+				double distance1 = (((-1*b - sqrt (discriminant))/2) - 0.001);	// to accomodate for float point errors 
+																				//(this value may be different for different pc's)
+				double distance2 = ((sqrt(discriminant) - b)/2) - 0.001;		// we make sure the intersection is outside the sphere
 
 				if (distance1 > 0) {
 					//whichever is closer

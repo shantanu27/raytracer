@@ -19,6 +19,8 @@
 #include "Sphere.h"
 #include "Vector.h"
 
+#define MAX_RAY_DEPTH 5
+
 using namespace std;
 
 struct RGBType {
@@ -134,7 +136,6 @@ int closestObjectIndex(vector<double> objects)
 					minimumValueIndex = index;
 				}
 			}
-
 			return minimumValueIndex;
 		} else {
 			// all the intersections were negative
@@ -149,21 +150,83 @@ Color computeColorAtIntersection(Vector intersectPosition,
 								vector<Object*> sceneObjects, 
 								int indexOfClosestObject, 
 								double lightAmbience,
-								vector<Light>& lightSources)
+								vector<Light>& lightSources,
+								int depth)
 {
 	Object* currentObject = sceneObjects.at(indexOfClosestObject);
 	Color surfaceColor = currentObject->getColor();
 	Vector surfaceNormal = currentObject->normalAt(intersectPosition);
 	bool isObjectInShadow = false;
 
+	//get the properties of sphere to be used later for specular, diffuse and ambient lighting
 	double kd = currentObject->getDiffuseCoefficient();
 	double ks = currentObject->getSpecularCoefficient();
+	double kr = currentObject->getReflectivity();
 	double n = currentObject->getPhongShininess();
 
 	Color finalColor(0,0,0);
 	Color diffuse(0,0,0);
 	Color specular(0,0,0);
 	Color ambient(0,0,0);
+
+	/* Reflected ray would be used for calculating specular component */
+	/* and the reflectivity */
+
+	if (ks == 2) {
+		//checkerboard pattern
+		int square = (int)floor(intersectPosition.getX()) + (int)floor(intersectPosition.getZ());
+		if (square % 2 == 0) {
+			//black square
+			surfaceColor.setRed(0);
+			surfaceColor.setGreen(0);
+			surfaceColor.setBlue(0);
+		} else {
+			//white square
+			surfaceColor.setRed(1);
+			surfaceColor.setGreen(1);
+			surfaceColor.setBlue(1);
+		}
+	}
+
+	/*Add reflectivity*/
+	if ((kr > 0 && kr <= 1) && (depth< MAX_RAY_DEPTH)) {
+		//calculate reflected ray
+		//R = I - 2(i.n)N - uppercase are vectors
+		Vector I = intersectDirection;
+		double IDotN = I.dotProduct(surfaceNormal);
+		Vector IDotNVector = surfaceNormal.scalarMultiply(IDotN);
+		IDotNVector = IDotNVector.scalarMultiply(2);
+		Vector reflectedRayDirection = I.subtract(IDotNVector);		//already normalized
+		reflectedRayDirection = reflectedRayDirection.normalize();
+
+		Ray reflectedRay(intersectPosition, reflectedRayDirection);
+
+		vector<double> reflectedRayIntersections;
+		for (vector<Object*>::iterator object = sceneObjects.begin(); object != sceneObjects.end(); ++object) {
+			reflectedRayIntersections.push_back((*object)->findIntersection(reflectedRay));
+		}
+
+		int indexOfclosestReflectedObject = closestObjectIndex(reflectedRayIntersections);
+		if (indexOfclosestReflectedObject != -1) {
+			//reflected ray hit some object in the scene
+			//the color at this point on the object would have some component
+			//of the object which the reflected ray hit
+			if (reflectedRayIntersections.at(indexOfclosestReflectedObject) > FLT_EPSILON) {
+				Vector reflectedObjectIntersectionPosition = intersectPosition.add(reflectedRayDirection.scalarMultiply(reflectedRayIntersections.at(indexOfclosestReflectedObject)));
+				Vector reflectedObjectDirection = reflectedRayDirection;
+				Color reflectedColor = computeColorAtIntersection(reflectedObjectIntersectionPosition,
+																  reflectedObjectDirection,
+																  sceneObjects,
+																  indexOfclosestReflectedObject,
+																  lightAmbience,
+																  lightSources,
+																  depth + 1);
+
+				//add the color based on the objects reflectivity
+				finalColor = finalColor.add(reflectedColor.scalarMultiply(kr));
+			}
+		}
+	}
 
 	for (vector<Light>::iterator light = lightSources.begin(); light != lightSources.end(); ++light) {
 
@@ -194,23 +257,26 @@ Color computeColorAtIntersection(Vector intersectPosition,
 			}
 		}
 
-		double lightDotNormal = surfaceNormal.dotProduct(vectorToLight);
-		lightDotNormal = lightDotNormal < 0 ? 0.0f : lightDotNormal;	
-
+		//add ambient component
 		if (kd > 0) {
-			ambient = finalColor.add((lightColor.scalarMultiply(lightAmbience*kd)).multiply(surfaceColor));
+			ambient = lightColor.multiply(surfaceColor.scalarMultiply(lightAmbience*kd));
 		} else {
-			ambient = finalColor.add((lightColor.scalarMultiply(lightAmbience)).multiply(surfaceColor));
-		}
+			ambient = lightColor.multiply(surfaceColor.scalarMultiply(lightAmbience));
+		}	
 
 		finalColor = finalColor.add(ambient);
 
 		if (isObjectInShadow == false) {
 
+			//if lightDotNormal is < 0 means we are behind the object (its in shadow)
+			double lightDotNormal = surfaceNormal.dotProduct(vectorToLight);
+			lightDotNormal = lightDotNormal < 0 ? 0.0f : lightDotNormal;
+
+			//add diffuse component
 			if (kd > 0) {
 				diffuse = diffuse.add(((surfaceColor.scalarMultiply(kd)).multiply(lightColor)).scalarMultiply(lightDotNormal));
 			}
-			
+
 			Vector L = vectorToLight;	//vector from intersection point to light normalized
 			Vector N = surfaceNormal;	// surface normal
 			Vector V = intersectDirection.negative().normalize();	//vector towards eye point
@@ -220,12 +286,14 @@ Color computeColorAtIntersection(Vector intersectPosition,
 
 			double RDotV = R.dotProduct(V);
 			
-			if (ks > 0 && n > 0) {
+			//add specular component
+			if (ks > 0 && ks <=1 && n > 0) {
 				specular = lightColor.scalarMultiply(ks*pow(RDotV,n)); 
 			}
+			
+			//Total illumination = ambient + diffuse + specular (ambient has already been added)
 			finalColor = (finalColor.add(diffuse)).add(specular);			
 		} 
-		
 	}
 
 	//default color is black
@@ -254,6 +322,7 @@ int main (int argc, char* argv[])
 	Vector Y(0.0, 1.0, 0.0);	//Up vector
 	Vector Z(0.0, 0.0, 1.0);
 
+	//camera specs
 	Vector cameraPos(3.0, 1.5, -4.0); 
 	Vector lookAt(0.0, 0.0, 0.0);
 
@@ -272,34 +341,49 @@ int main (int argc, char* argv[])
 	Color maroon(0.5, 0.25, 0.25);
 	Color gray(0.5, 0.5, 0.5);
 	Color black(0.0, 0.0, 0.0);
+	Color red(1, 0.2, 0);
 
 	//define light ambience and store light sources in a vector
 	double lightAmbience = 0.2;
 	vector<Light> lightSources;
 
-	Vector lightPosition(-7.0, 10.0, -10.0);
-	Light sceneLight(lightPosition, white);
-	lightSources.push_back(sceneLight);
+	Vector lightPosition1(-7.0, 10.0, -10.0);
+	Light sceneLight1(lightPosition1, white);
+	lightSources.push_back(sceneLight1);
 
 	//Vector to store the current objects in the scene
 	vector<Object *> sceneObjects;
 
 	//scene description
-	Sphere sceneSphere(O, 1, prettyGreen);
-	sceneSphere.setDiffuseCoefficient(0.5);
-	sceneSphere.setSpecularCoefficient(0.3);
-	sceneSphere.setPhongShininess(10);	
+	Sphere sceneSphere1(O, 1, prettyGreen);
+	sceneSphere1.setDiffuseCoefficient(0.5);
+	sceneSphere1.setSpecularCoefficient(0.3);
+	sceneSphere1.setPhongShininess(10);
+	sceneSphere1.setReflectivity(0.4);
 
-	Plane scenePlane(Y, -1, maroon);
-	scenePlane.setDiffuseCoefficient(0.5);
+	Sphere sceneSphere2(Vector(2, 0, 0.5), 0.5, maroon);
+	sceneSphere2.setDiffuseCoefficient(0.5);
+	sceneSphere2.setSpecularCoefficient(0.3);
+	sceneSphere2.setPhongShininess(10);
+	sceneSphere2.setReflectivity(0.4);
 
-	sceneObjects.push_back(dynamic_cast<Object *>(&sceneSphere));
+
+	Plane scenePlane(Y, -1, white);
+	scenePlane.setDiffuseCoefficient(0.8);
+	scenePlane.setSpecularCoefficient(0.3);
+	scenePlane.setPhongShininess(10);
+	//although not a specular coefficient, I will use it to define checkerboard pattern 
+	//TODO: figure out a way to map patter
+	scenePlane.setSpecularCoefficient(2);
+
+	sceneObjects.push_back(dynamic_cast<Object *>(&sceneSphere1));
+	sceneObjects.push_back(dynamic_cast<Object *>(&sceneSphere2));
 	sceneObjects.push_back(dynamic_cast<Object *>(&scenePlane));
 		
 	for (int x=0; x < width; x++) {
 		for (int y=0; y < height; y++ ) {
 			currentPixel = y*width + x;
-
+			
 			// no anti aliasing
 			if (width  > height) {
 				// the image is wider than it is tall
@@ -339,22 +423,26 @@ int main (int argc, char* argv[])
 					Vector intersectPosition = cameraRayOrigin.add(cameraRayDirection.scalarMultiply(intersections.at(indexOfClosestObject)));
 					Vector intersectDirection = cameraRayDirection;
 
+					int depth = 0;
 					Color intersectionColor = computeColorAtIntersection(intersectPosition, 
 																		intersectDirection, 
 																		sceneObjects, 
 																		indexOfClosestObject, 
 																		lightAmbience,
-																		lightSources);
+																		lightSources,
+																		depth);
 
 					pixels[currentPixel].r = intersectionColor.getRed();
 					pixels[currentPixel].g = intersectionColor.getGreen();
 					pixels[currentPixel].b = intersectionColor.getBlue();
 				}
 			}
-		}
+		}	
 	}
 
 	saveBmp("scene.bmp", width, height, dpi, pixels);
+
+	delete pixels;
 
 	return 0;
 }
