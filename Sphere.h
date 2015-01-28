@@ -54,7 +54,7 @@ class Sphere : public Object {
 
 				// the first root 
 				double distance1 = (((-1*b - sqrt (discriminant))/2) - 0.001);	// to accomodate for float point errors 
-																				//(this value may be different for different pc's)
+																				//(this value may be different for different systems)
 				double distance2 = ((sqrt(discriminant) - b)/2) - 0.001;		// we make sure the intersection is outside the sphere
 
 				if (distance1 > 0) {

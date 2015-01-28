@@ -6,9 +6,9 @@ class Vector {
 		Vector();
 		Vector(double, double, double);
 
-		double getX() { return x; }
-		double getY() { return y; }
-		double getZ() { return z; }
+		double getX() const { return x; }
+		double getY() const { return y; }
+		double getZ() const { return z; }
 
 		double magnitude();
 
@@ -40,6 +40,16 @@ class Vector {
 		Vector crossProduct (Vector v) 
 		{
 			return Vector(y*v.getZ() - z*v.getY(), z*v.getX() - x*v.getZ(), x*v.getY() - y*v.getX());
+		}
+
+		Vector operator+ (const Vector &v)
+		{
+			return Vector(x + v.getX(), y + v.getY(), z + v.getZ());
+		}
+
+		Vector operator- (const Vector &v)
+		{
+			return Vector(x - v.getX(), y - v.getY(), z - v.getZ());
 		}
 
 	private:

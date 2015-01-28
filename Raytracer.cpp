@@ -189,7 +189,7 @@ Color computeColorAtIntersection(Vector intersectPosition,
 	}
 
 	/*Add reflectivity*/
-	if ((kr > 0 && kr <= 1) && (depth< MAX_RAY_DEPTH)) {
+	if ((kr > 0 && kr <= 1) && (depth < MAX_RAY_DEPTH)) {
 		//calculate reflected ray
 		//R = I - 2(i.n)N - uppercase are vectors
 		Vector I = intersectDirection;
@@ -300,20 +300,25 @@ Color computeColorAtIntersection(Vector intersectPosition,
 	return finalColor.clip();
 }	
 
-int currentPixel;
-
 int main (int argc, char* argv[]) 
 {
 
 	cout<<"Rendering..."<<endl;
 
 	int dpi = 72;
-	int width = 640;
-	int height = 480;
+	int width = 1024;
+	int height = 720;
 	int n = width*height;
 
-	double  aspectRatio = (double)width / (double)height;
+	double aspectRatio = (double)width / (double)height;
 	double xAmnt, yAmnt;
+
+	int antiAliasDepth = 4;
+	double antiAliasThreshold = 0.1;
+
+	//currentPixel represents the current pixel being iterated over the image
+	//aaPixel represents the pixel within the currentPixel to support anti aliasing
+	int currentPixel, aaPixel;
 
 	RGBType *pixels = new RGBType[n];
 
@@ -323,18 +328,41 @@ int main (int argc, char* argv[])
 	Vector Z(0.0, 0.0, 1.0);
 
 	//camera specs
-	Vector cameraPos(3.0, 1.5, -4.0); 
+	Vector cameraPos(3, 1.5, -4.0); 
 	Vector lookAt(0.0, 0.0, 0.0);
 
-	Vector viewDirection(cameraPos.getX()-lookAt.getX(), 
-					   cameraPos.getY()-lookAt.getY(), 
-					   cameraPos.getZ()-lookAt.getZ());
+	Vector cameraDirection = (lookAt - cameraPos).normalize();	
+	Vector cameraRight = Y.crossProduct(cameraDirection).normalize();		
+	Vector cameraUp = cameraRight.crossProduct(cameraDirection).normalize();
 
-	Vector cameraDirection = viewDirection.negative().normalize();
-	Vector cameraRight = Y.crossProduct(cameraDirection).normalize();		//for cameraUp ==> cameraDirection x Up
-	Vector cameraDown = cameraRight.crossProduct(cameraDirection).normalize();
+	double fov = M_PI/2;
+	double cameraDistance = (cameraPos - lookAt).magnitude();
+	double h = cameraDistance*(tan(fov/2));
+	double sj, sk;
 
-	Camera sceneCamera(cameraPos, cameraDirection, cameraRight, cameraDown);
+	//need appropriate values of sj and sk to avoid perspective distortion
+	//http://web.cs.wpi.edu/~emmanuel/courses/cs563/S10/talks/cs563_lecture2.pdf
+	if (width > height) {
+		sk = 2*h;
+		sj = sk*aspectRatio;
+	} else if (height > width) {
+		//not sure about these equations, obtained through hit n trial
+		sj = 2*h;
+		sk = sj/aspectRatio;
+	} else {
+		sj = 2*h;
+		sk = sj;
+	}
+	
+
+	//calculating the position of top left of the pixel in world coordinates, I'll call it P0
+	Vector P0 = lookAt  
+			  + (cameraDirection.scalarMultiply(cameraDistance))
+			  - (cameraRight.scalarMultiply(sj/2))
+			  + (cameraUp.scalarMultiply(sk/2));  
+
+
+	Camera sceneCamera(cameraPos, cameraDirection, cameraRight, cameraUp);
 
 	Color white(1.0, 1.0, 1.0);
 	Color prettyGreen(0.5, 1.0, 0.5);
@@ -373,74 +401,166 @@ int main (int argc, char* argv[])
 	scenePlane.setSpecularCoefficient(0.3);
 	scenePlane.setPhongShininess(10);
 	//although not a specular coefficient, I will use it to define checkerboard pattern 
-	//TODO: figure out a way to map patter
+	//TODO: figure out a way to map pattern
 	scenePlane.setSpecularCoefficient(2);
 
 	sceneObjects.push_back(dynamic_cast<Object *>(&sceneSphere1));
 	sceneObjects.push_back(dynamic_cast<Object *>(&sceneSphere2));
 	sceneObjects.push_back(dynamic_cast<Object *>(&scenePlane));
 		
-	for (int x=0; x < width; x++) {
-		for (int y=0; y < height; y++ ) {
+	for (int x = 0; x < width; x++) {
+		for (int y = 0; y < height; y++) {
 			currentPixel = y*width + x;
 			
-			// no anti aliasing
-			if (width  > height) {
-				// the image is wider than it is tall
-				xAmnt = ((x+0.5)/width)*aspectRatio - (((width - height)/(double)height)/2);
-				yAmnt = ((height - y) + 0.5)/height;
-			} else if (height > width) {
-				// the image is taller than it is wide
-				xAmnt = (x + 0.5)/width;
-				yAmnt = (((height - y) + 0.5)/height)/aspectRatio - (((height - width)/(double)width)/2);
-			} else {
-				// the image is square
-				xAmnt = (x + 0.5)/width;
-				yAmnt = ((height - y) + 0.5)/height;
-			}
+			//begin with blank pixels
+			double tempRed[antiAliasDepth*antiAliasDepth];
+			double tempGreen[antiAliasDepth*antiAliasDepth];
+			double tempBlue[antiAliasDepth*antiAliasDepth];
 
-			Vector cameraRayOrigin = sceneCamera.getPosition();
-			Vector cameraRayDirection = cameraDirection.add(cameraRight.scalarMultiply(xAmnt - 0.5).add(cameraDown.scalarMultiply(yAmnt - 0.5))).normalize();
-			Ray cameraRay(cameraRayOrigin, cameraRayDirection);
+			// // no anti aliasing
+			// if (width  > height) {
+			// 	// the image is wider than it is tall
+			// 	xAmnt = ((x+0.5)/width)*aspectRatio - (((width - height)/(double)height)/2);
+			// 	yAmnt = ((height - y) + 0.5)/height;
+			// } else if (height > width) {
+			// 	// the image is taller than it is wide
+			// 	xAmnt = (x + 0.5)/width;
+			// 	yAmnt = (((height - y) + 0.5)/height)/aspectRatio - (((height - width)/(double)width)/2);
+			// } else {
+			// 	// the image is square
+			// 	xAmnt = (x + 0.5)/width;
+			// 	yAmnt = ((height - y) + 0.5)/height;
+			// }
 
-			vector<double> intersections;
+			for (int aax = 0; aax < antiAliasDepth; aax++) {
+				for (int aay = 0; aay <antiAliasDepth; aay++) {
 
-			for (int index = 0; index < sceneObjects.size(); index++) {
-				intersections.push_back(sceneObjects.at(index)->findIntersection(cameraRay));
-			}
+					aaPixel = aay*antiAliasDepth + aax;
 
-			int indexOfClosestObject = closestObjectIndex(intersections);
+					//no anti aliasing
+					if (antiAliasDepth == 1) {
+						Vector pixelCoordinate = P0 + (cameraRight.scalarMultiply(sj*((double)x/(double)(width - 1))))
+										- (cameraUp.scalarMultiply(sk*((double)y/(double)(height - 1))));
 
-			// return color
-			if (indexOfClosestObject == -1) {
-				pixels[currentPixel].r = 0;
-				pixels[currentPixel].g = 0;
-				pixels[currentPixel].b = 0;
-			} else {
-				// to accomodate for precision errors
-				if (intersections.at(indexOfClosestObject) > FLT_EPSILON) {
-					//calculate intersection position
-					Vector intersectPosition = cameraRayOrigin.add(cameraRayDirection.scalarMultiply(intersections.at(indexOfClosestObject)));
-					Vector intersectDirection = cameraRayDirection;
+						Vector cameraRayOrigin = sceneCamera.getPosition();
+						//Vector cameraRayDirection = cameraDirection.add(cameraRight.scalarMultiply(xAmnt - 0.5).add(cameraDown.scalarMultiply(yAmnt - 0.5))).normalize();
+						Vector cameraRayDirection = (pixelCoordinate - cameraRayOrigin).normalize();
 
-					int depth = 0;
-					Color intersectionColor = computeColorAtIntersection(intersectPosition, 
-																		intersectDirection, 
-																		sceneObjects, 
-																		indexOfClosestObject, 
-																		lightAmbience,
-																		lightSources,
-																		depth);
+						Ray cameraRay(cameraRayOrigin, cameraRayDirection);
 
-					pixels[currentPixel].r = intersectionColor.getRed();
-					pixels[currentPixel].g = intersectionColor.getGreen();
-					pixels[currentPixel].b = intersectionColor.getBlue();
+						vector<double> intersections;
+
+						for (int index = 0; index < sceneObjects.size(); index++) {
+							intersections.push_back(sceneObjects.at(index)->findIntersection(cameraRay));
+						}
+
+						int indexOfClosestObject = closestObjectIndex(intersections);
+
+						// return color
+						if (indexOfClosestObject == -1) {
+							tempRed[aaPixel] = 0;
+							tempGreen[aaPixel] = 0;
+							tempBlue[aaPixel] = 0;
+						} else {
+							// to accomodate for precision errors
+							if (intersections.at(indexOfClosestObject) > FLT_EPSILON) {
+								//calculate intersection position
+								Vector intersectPosition = cameraRayOrigin + (cameraRayDirection.scalarMultiply(intersections.at(indexOfClosestObject)));
+								Vector intersectDirection = cameraRayDirection;
+
+								int depth = 0;
+								Color intersectionColor = computeColorAtIntersection(intersectPosition, 
+																					intersectDirection, 
+																					sceneObjects, 
+																					indexOfClosestObject, 
+																					lightAmbience,
+																					lightSources,
+																					depth);
+
+								tempRed[aaPixel] = intersectionColor.getRed();
+								tempGreen[aaPixel] = intersectionColor.getGreen();
+								tempBlue[aaPixel] = intersectionColor.getBlue();
+							}
+						}
+					} else {
+						//anti aliasing
+
+						Vector pixelCoordinate = P0 + (cameraRight.scalarMultiply(sj * ((double)(x + (double)aax / (double)(antiAliasDepth - 1)) / (double)(width - 1))))
+													- (cameraUp.scalarMultiply(sk * ((double)(y + (double)aay / (double)(antiAliasDepth - 1)) / (double)(height - 1))));
+
+						Vector cameraRayOrigin = sceneCamera.getPosition();
+						//Vector cameraRayDirection = cameraDirection.add(cameraRight.scalarMultiply(xAmnt - 0.5).add(cameraDown.scalarMultiply(yAmnt - 0.5))).normalize();
+						Vector cameraRayDirection = (pixelCoordinate - cameraRayOrigin).normalize();
+
+						Ray cameraRay(cameraRayOrigin, cameraRayDirection);
+
+						vector<double> intersections;
+
+						for (int index = 0; index < sceneObjects.size(); index++) {
+							intersections.push_back(sceneObjects.at(index)->findIntersection(cameraRay));
+						}
+
+						int indexOfClosestObject = closestObjectIndex(intersections);
+
+						// return color
+						if (indexOfClosestObject == -1) {
+							tempRed[aaPixel] = 0;
+							tempGreen[aaPixel] = 0;
+							tempBlue[aaPixel] = 0;
+						} else {
+							// to accomodate for precision errors
+							if (intersections.at(indexOfClosestObject) > FLT_EPSILON) {
+								//calculate intersection position
+								Vector intersectPosition = cameraRayOrigin + (cameraRayDirection.scalarMultiply(intersections.at(indexOfClosestObject)));
+								Vector intersectDirection = cameraRayDirection;
+
+								int depth = 0;
+								Color intersectionColor = computeColorAtIntersection(intersectPosition, 
+																					intersectDirection, 
+																					sceneObjects, 
+																					indexOfClosestObject, 
+																					lightAmbience,
+																					lightSources,
+																					depth);
+
+								tempRed[aaPixel] = intersectionColor.getRed();
+								tempGreen[aaPixel] = intersectionColor.getGreen();
+								tempBlue[aaPixel] = intersectionColor.getBlue();;
+							}
+						}
+					}
 				}
 			}
+
+			//calculate the average color and apply that as the pixel color
+
+			double totalRed = 0;
+			double totalGreen = 0;
+			double totalBlue = 0;
+
+			for (int r = 0; r < antiAliasDepth*antiAliasDepth; r++) {
+				totalRed += tempRed[r];
+			}
+
+			for (int g = 0; g < antiAliasDepth*antiAliasDepth; g++) {
+				totalGreen += tempGreen[g];
+			}
+
+			for (int b = 0; b < antiAliasDepth*antiAliasDepth; b++) {
+				totalBlue += tempBlue[b];
+			}
+
+			double averageRed = totalRed / (antiAliasDepth*antiAliasDepth);
+			double averageGreen = totalGreen / (antiAliasDepth*antiAliasDepth);
+			double averageBlue = totalBlue / (antiAliasDepth*antiAliasDepth);
+
+			pixels[currentPixel].r = averageRed;
+			pixels[currentPixel].g = averageGreen;
+			pixels[currentPixel].b = averageBlue;
 		}	
 	}
 
-	saveBmp("scene.bmp", width, height, dpi, pixels);
+	saveBmp("scene_antiAliased.bmp", width, height, dpi, pixels);
 
 	delete pixels;
 

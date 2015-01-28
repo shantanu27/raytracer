@@ -1,6 +1,8 @@
 #ifndef _CAMERA_H
 #define _CAMERA_H
 
+#include <cmath>
+
 #include "Vector.h"
 
 class Camera {
@@ -16,6 +18,7 @@ class Camera {
 
 	private:
 		Vector cameraPosition, cameraDirection, cameraRight, cameraDown;
+		double cameraDistance;
 };
 
 Camera::Camera () 
