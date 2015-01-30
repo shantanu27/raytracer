@@ -39,7 +39,6 @@ Vector Vector::normalize ()
 	if (vecMagnitude > 0) {
 		return Vector(x/vecMagnitude, y/vecMagnitude, z/vecMagnitude);
 	} else {
-		cout<<"ERROR!! Vector with magnitude 0 not allowed"<<endl;
 		return Vector(0.0,0.0,0.0);
 	}
 }

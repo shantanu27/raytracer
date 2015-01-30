@@ -2,7 +2,6 @@
 #define _PLANE_H
 
 #include "Color.h"
-#include "Plane.h"
 #include "Vector.h"
 
 class Plane : public Object {
@@ -11,7 +10,6 @@ class Plane : public Object {
 		Plane (Vector normal, double distanceValue, Color color);
 
 		//method functions
-		Vector getNormal() { return normal; }
 		double getDistance() { return distance; }
 		virtual Color getColor() { return color; }
 
@@ -21,13 +19,13 @@ class Plane : public Object {
 		{
 			Vector rayDirection = ray.getDirection();
 
-			double a = rayDirection.dotProduct(normal);
+			double a = rayDirection.dot(normal);
 
 			if (a == 0.0) {
 				//ray is parallel to the plane
 				return -1;
 			} else {
-				double b = normal.dotProduct(ray.getOrigin().add(normal.scalarMultiply(distance).negative()));
+				double b = normal.dot(ray.getOrigin() + normal.scalarMultiply(distance).negative());
 				return -1*b/a;
 			}
 		}

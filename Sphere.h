@@ -21,7 +21,7 @@ class Sphere : public Object {
 		virtual Vector normalAt(Vector point) 
 		{
 			//normal points away from the center
-			Vector normalVector = point.add(center.negative()).normalize();
+			Vector normalVector = (point + center.negative()).normalize();
 			return normalVector;
 		}
 

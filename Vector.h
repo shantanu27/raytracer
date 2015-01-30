@@ -32,12 +32,12 @@ class Vector {
 		Vector scalarDivide (double s);
 		Vector normalize ();
 
-		double dotProduct (Vector v) 
+		double dot (Vector v) 
 		{
 			return x*v.getX() + y*v.getY() + z*v.getZ();
 		}
 
-		Vector crossProduct (Vector v) 
+		Vector cross (Vector v) 
 		{
 			return Vector(y*v.getZ() - z*v.getY(), z*v.getX() - x*v.getZ(), x*v.getY() - y*v.getX());
 		}

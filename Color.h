@@ -6,9 +6,9 @@ class Color {
 		Color ();
 		Color (double red, double green, double blue);
 
-		double getRed() { return red; }
-		double getGreen() { return green; }
-		double getBlue() { return blue; }
+		double getRed() const { return red; }
+		double getGreen() const { return green; }
+		double getBlue() const { return blue; }
 
 		double setRed(double redValue) { red = redValue; }
 		double setGreen(double greenValue) { green = greenValue; }
@@ -59,6 +59,16 @@ class Color {
 			if (blue < 0) { red = 0; }
 
 			return Color(red, green, blue);
+		}
+
+		Color operator+ (const Color &c)
+		{
+			return Color(red + c.getRed(), green + c.getGreen(), blue + c.getBlue());
+		}
+
+		Color operator- (const Color &c)
+		{
+			return Color(red - c.getRed(), green - c.getGreen(), blue - c.getBlue());
 		}
 
 	private:

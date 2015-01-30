@@ -8,7 +8,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
 
 #include "Camera.h"
 #include "Color.h"
@@ -17,6 +16,7 @@
 #include "Plane.h"
 #include "Ray.h"
 #include "Sphere.h"
+#include "Triangle.h"
 #include "Vector.h"
 
 #define MAX_RAY_DEPTH 5
@@ -188,15 +188,16 @@ Color computeColorAtIntersection(Vector intersectPosition,
 		}
 	}
 
+	// Refer to https://steveharveynz.wordpress.com/category/programming/c-raytracer/
 	/*Add reflectivity*/
 	if ((kr > 0 && kr <= 1) && (depth < MAX_RAY_DEPTH)) {
 		//calculate reflected ray
 		//R = I - 2(i.n)N - uppercase are vectors
 		Vector I = intersectDirection;
-		double IDotN = I.dotProduct(surfaceNormal);
+		double IDotN = I.dot(surfaceNormal);
 		Vector IDotNVector = surfaceNormal.scalarMultiply(IDotN);
 		IDotNVector = IDotNVector.scalarMultiply(2);
-		Vector reflectedRayDirection = I.subtract(IDotNVector);		//already normalized
+		Vector reflectedRayDirection = I - IDotNVector;		//already normalized
 		reflectedRayDirection = reflectedRayDirection.normalize();
 
 		Ray reflectedRay(intersectPosition, reflectedRayDirection);
@@ -212,7 +213,8 @@ Color computeColorAtIntersection(Vector intersectPosition,
 			//the color at this point on the object would have some component
 			//of the object which the reflected ray hit
 			if (reflectedRayIntersections.at(indexOfclosestReflectedObject) > FLT_EPSILON) {
-				Vector reflectedObjectIntersectionPosition = intersectPosition.add(reflectedRayDirection.scalarMultiply(reflectedRayIntersections.at(indexOfclosestReflectedObject)));
+				Vector reflectedObjectIntersectionPosition = intersectPosition 
+														   + reflectedRayDirection.scalarMultiply(reflectedRayIntersections.at(indexOfclosestReflectedObject));
 				Vector reflectedObjectDirection = reflectedRayDirection;
 				Color reflectedColor = computeColorAtIntersection(reflectedObjectIntersectionPosition,
 																  reflectedObjectDirection,
@@ -223,7 +225,7 @@ Color computeColorAtIntersection(Vector intersectPosition,
 																  depth + 1);
 
 				//add the color based on the objects reflectivity
-				finalColor = finalColor.add(reflectedColor.scalarMultiply(kr));
+				finalColor = finalColor + reflectedColor.scalarMultiply(kr);
 			}
 		}
 	}
@@ -233,7 +235,7 @@ Color computeColorAtIntersection(Vector intersectPosition,
 		Color lightColor = light->getColor();
 
 		// rayToLight = lightSourceCenter - intersectPoint
-		Vector vectorToLight = (light->getPosition()).subtract(intersectPosition);
+		Vector vectorToLight = (light->getPosition()) - intersectPosition;
 		double lightSourceDistance = vectorToLight.magnitude();
 		vectorToLight = vectorToLight.normalize();		
 
@@ -264,27 +266,27 @@ Color computeColorAtIntersection(Vector intersectPosition,
 			ambient = lightColor.multiply(surfaceColor.scalarMultiply(lightAmbience));
 		}	
 
-		finalColor = finalColor.add(ambient);
+		finalColor = finalColor + ambient;
 
 		if (isObjectInShadow == false) {
 
 			//if lightDotNormal is < 0 means we are behind the object (its in shadow)
-			double lightDotNormal = surfaceNormal.dotProduct(vectorToLight);
+			double lightDotNormal = surfaceNormal.dot(vectorToLight);
 			lightDotNormal = lightDotNormal < 0 ? 0.0f : lightDotNormal;
 
 			//add diffuse component
 			if (kd > 0) {
-				diffuse = diffuse.add(((surfaceColor.scalarMultiply(kd)).multiply(lightColor)).scalarMultiply(lightDotNormal));
+				diffuse = diffuse + ((surfaceColor.scalarMultiply(kd)).multiply(lightColor)).scalarMultiply(lightDotNormal);
 			}
 
 			Vector L = vectorToLight;	//vector from intersection point to light normalized
 			Vector N = surfaceNormal;	// surface normal
 			Vector V = intersectDirection.negative().normalize();	//vector towards eye point
 
-			double LDotN = L.dotProduct(N);
-			Vector R = (N.scalarMultiply(2*LDotN)).subtract(L);		//reflected ray
+			double LDotN = L.dot(N);
+			Vector R = (N.scalarMultiply(2*LDotN)) - L;		//reflected ray
 
-			double RDotV = R.dotProduct(V);
+			double RDotV = R.dot(V);
 			
 			//add specular component
 			if (ks > 0 && ks <=1 && n > 0) {
@@ -292,7 +294,7 @@ Color computeColorAtIntersection(Vector intersectPosition,
 			}
 			
 			//Total illumination = ambient + diffuse + specular (ambient has already been added)
-			finalColor = (finalColor.add(diffuse)).add(specular);			
+			finalColor = finalColor + diffuse + specular;			
 		} 
 	}
 
@@ -313,7 +315,7 @@ int main (int argc, char* argv[])
 	double aspectRatio = (double)width / (double)height;
 	double xAmnt, yAmnt;
 
-	int antiAliasDepth = 4;
+	int antiAliasDepth = 2;
 	double antiAliasThreshold = 0.1;
 
 	//currentPixel represents the current pixel being iterated over the image
@@ -332,8 +334,8 @@ int main (int argc, char* argv[])
 	Vector lookAt(0.0, 0.0, 0.0);
 
 	Vector cameraDirection = (lookAt - cameraPos).normalize();	
-	Vector cameraRight = Y.crossProduct(cameraDirection).normalize();		
-	Vector cameraUp = cameraRight.crossProduct(cameraDirection).normalize();
+	Vector cameraRight = Y.cross(cameraDirection).normalize();		
+	Vector cameraUp = cameraRight.cross(cameraDirection).normalize();
 
 	double fov = M_PI/2;
 	double cameraDistance = (cameraPos - lookAt).magnitude();
@@ -370,6 +372,7 @@ int main (int argc, char* argv[])
 	Color gray(0.5, 0.5, 0.5);
 	Color black(0.0, 0.0, 0.0);
 	Color red(1, 0.2, 0);
+	Color darkOrange(1, 0.549, 0);
 
 	//define light ambience and store light sources in a vector
 	double lightAmbience = 0.2;
@@ -404,9 +407,16 @@ int main (int argc, char* argv[])
 	//TODO: figure out a way to map pattern
 	scenePlane.setSpecularCoefficient(2);
 
+	Triangle sceneTriangle(Vector(3,0,2), Vector(0,2,0), Vector(0,0,3), darkOrange);
+	sceneTriangle.setDiffuseCoefficient(0.5);
+	sceneTriangle.setSpecularCoefficient(0.3);
+	sceneTriangle.setPhongShininess(10);
+	sceneTriangle.setReflectivity(0.3);
+
 	sceneObjects.push_back(dynamic_cast<Object *>(&sceneSphere1));
 	sceneObjects.push_back(dynamic_cast<Object *>(&sceneSphere2));
 	sceneObjects.push_back(dynamic_cast<Object *>(&scenePlane));
+	sceneObjects.push_back(dynamic_cast<Object *>(&sceneTriangle));
 		
 	for (int x = 0; x < width; x++) {
 		for (int y = 0; y < height; y++) {
@@ -440,7 +450,7 @@ int main (int argc, char* argv[])
 					//no anti aliasing
 					if (antiAliasDepth == 1) {
 						Vector pixelCoordinate = P0 + (cameraRight.scalarMultiply(sj*((double)x/(double)(width - 1))))
-										- (cameraUp.scalarMultiply(sk*((double)y/(double)(height - 1))));
+													- (cameraUp.scalarMultiply(sk*((double)y/(double)(height - 1))));
 
 						Vector cameraRayOrigin = sceneCamera.getPosition();
 						//Vector cameraRayDirection = cameraDirection.add(cameraRight.scalarMultiply(xAmnt - 0.5).add(cameraDown.scalarMultiply(yAmnt - 0.5))).normalize();
@@ -483,7 +493,7 @@ int main (int argc, char* argv[])
 							}
 						}
 					} else {
-						//anti aliasing
+						//anti-aliasing
 
 						Vector pixelCoordinate = P0 + (cameraRight.scalarMultiply(sj * ((double)(x + (double)aax / (double)(antiAliasDepth - 1)) / (double)(width - 1))))
 													- (cameraUp.scalarMultiply(sk * ((double)(y + (double)aay / (double)(antiAliasDepth - 1)) / (double)(height - 1))));
@@ -560,7 +570,7 @@ int main (int argc, char* argv[])
 		}	
 	}
 
-	saveBmp("scene_antiAliased.bmp", width, height, dpi, pixels);
+	saveBmp("scene.bmp", width, height, dpi, pixels);
 
 	delete pixels;
 
