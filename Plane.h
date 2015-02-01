@@ -2,6 +2,7 @@
 #define _PLANE_H
 
 #include "Color.h"
+#include "Object.h"
 #include "Vector.h"
 
 class Plane : public Object {

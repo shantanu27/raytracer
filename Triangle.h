@@ -4,6 +4,7 @@
 #include <cfloat>
 
 #include "Color.h"
+#include "Object.h"
 #include "Vector.h"
 
 using namespace std;

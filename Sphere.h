@@ -5,7 +5,7 @@
 #include <cmath>
 
 #include "Color.h"
-#include "Sphere.h"
+#include "Object.h"
 #include "Vector.h"
 
 class Sphere : public Object {

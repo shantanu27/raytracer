@@ -1,5 +1,5 @@
 CC = g++
-DEPS = Camera.h Color.h Plane.h Object.h Sphere.h Triangle.h Ray.h Vector.h Light.h 
+DEPS = Camera.h Color.h Plane.h Object.h Quadric.h Sphere.h Triangle.h Ray.h Vector.h Light.h 
 OBJ = Raytracer.o
 VEC = Vector.o
 

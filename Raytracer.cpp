@@ -13,6 +13,7 @@
 #include "Color.h"
 #include "Light.h"
 #include "Object.h"
+#include "Quadric.h"
 #include "Plane.h"
 #include "Ray.h"
 #include "Sphere.h"
@@ -315,7 +316,7 @@ int main (int argc, char* argv[])
 	double aspectRatio = (double)width / (double)height;
 	double xAmnt, yAmnt;
 
-	int antiAliasDepth = 2;
+	int antiAliasDepth = 1;
 	double antiAliasThreshold = 0.1;
 
 	//currentPixel represents the current pixel being iterated over the image
@@ -373,6 +374,7 @@ int main (int argc, char* argv[])
 	Color black(0.0, 0.0, 0.0);
 	Color red(1, 0.2, 0);
 	Color darkOrange(1, 0.549, 0);
+	Color lightSlateBlue(0.517647, 0.439216, 1);
 
 	//define light ambience and store light sources in a vector
 	double lightAmbience = 0.2;
@@ -413,10 +415,17 @@ int main (int argc, char* argv[])
 	sceneTriangle.setPhongShininess(10);
 	sceneTriangle.setReflectivity(0.3);
 
+	Quadric sceneCylinder(Vector(1, 0, 1), Vector(0, 0, 0), Vector(0, -1, 0), 2, lightSlateBlue);
+	sceneCylinder.setDiffuseCoefficient(0.5);
+	sceneCylinder.setSpecularCoefficient(0.3);
+	sceneCylinder.setPhongShininess(10);
+	sceneCylinder.setReflectivity(0);
+
 	sceneObjects.push_back(dynamic_cast<Object *>(&sceneSphere1));
 	sceneObjects.push_back(dynamic_cast<Object *>(&sceneSphere2));
 	sceneObjects.push_back(dynamic_cast<Object *>(&scenePlane));
 	sceneObjects.push_back(dynamic_cast<Object *>(&sceneTriangle));
+	//sceneObjects.push_back(dynamic_cast<Object *>(&sceneCylinder));
 		
 	for (int x = 0; x < width; x++) {
 		for (int y = 0; y < height; y++) {
